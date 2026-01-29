@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>D20 (Node + Three.js)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f14;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+
+    <!-- IMPORT MAP: must load BEFORE any module imports -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three/build/three.module.js",
+          "three/addons/": "/vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
