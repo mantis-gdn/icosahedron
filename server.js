@@ -8,19 +8,41 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve your app
-app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
+// --------------------
+// Static app files
+// --------------------
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    extensions: ["html"]
+  })
+);
 
-// Serve Three.js directly from node_modules
+// --------------------
+// Vendor libraries
+// --------------------
+
+// Three.js
 app.use(
   "/vendor/three",
   express.static(path.join(__dirname, "node_modules", "three"))
 );
 
+// Cannon-ES (PHYSICS)
+app.use(
+  "/vendor/cannon-es",
+  express.static(path.join(__dirname, "node_modules", "cannon-es", "dist"))
+);
+
+// --------------------
+// Root
+// --------------------
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// --------------------
+// Start server
+// --------------------
 app.listen(PORT, () => {
-  console.log(`✅ D20 running at http://localhost:${PORT}`);
+  console.log(`🎲 D20 running at http://localhost:${PORT}`);
 });

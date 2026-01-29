@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import * as CANNON from "cannon-es";
 
 // --------------------
 // Scene
@@ -14,9 +15,9 @@ const camera = new THREE.PerspectiveCamera(
   55,
   window.innerWidth / window.innerHeight,
   0.1,
-  100
+  200
 );
-camera.position.set(2.8, 2.2, 2.8);
+camera.position.set(6, 5, 6);
 
 // --------------------
 // Renderer
@@ -35,6 +36,7 @@ document.body.appendChild(renderer.domElement);
 // --------------------
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+controls.target.set(0, 0.6, 0);
 
 // --------------------
 // Lights
@@ -42,12 +44,70 @@ controls.enableDamping = true;
 scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
 const key = new THREE.DirectionalLight(0xffffff, 1.0);
-key.position.set(5, 6, 4);
+key.position.set(8, 10, 6);
 scene.add(key);
 
 const rim = new THREE.DirectionalLight(0xffffff, 0.6);
-rim.position.set(-5, 2, -4);
+rim.position.set(-8, 3, -6);
 scene.add(rim);
+
+// --------------------
+// UI
+// --------------------
+const ui = document.createElement("div");
+ui.style.cssText = `
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 10;
+  user-select: none;
+`;
+
+const rollBtn = document.createElement("button");
+rollBtn.textContent = "ROLL D20";
+rollBtn.style.cssText = `
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.92);
+  padding: 10px 14px;
+  font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  letter-spacing: 0.08em;
+  border-radius: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+`;
+rollBtn.onmouseenter = () => (rollBtn.style.background = "rgba(255,255,255,0.12)");
+rollBtn.onmouseleave = () => (rollBtn.style.background = "rgba(255,255,255,0.08)");
+
+const resultPill = document.createElement("div");
+resultPill.textContent = "TOP: —";
+resultPill.style.cssText = `
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+`;
+
+ui.appendChild(rollBtn);
+ui.appendChild(resultPill);
+document.body.appendChild(ui);
+
+// --------------------
+// Helpers
+// --------------------
+function rand(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function ensureNonIndexed(geo) {
+  // Some Three builds already create non-indexed polyhedra
+  return geo.index ? geo.toNonIndexed() : geo;
+}
 
 // --------------------
 // Number Texture
@@ -58,11 +118,9 @@ function makeNumberTexture(n, size = 512) {
   c.height = size;
   const ctx = c.getContext("2d");
 
-  // Background
   ctx.fillStyle = "#0b0f14";
   ctx.fillRect(0, 0, size, size);
 
-  // Subtle vignette
   const grad = ctx.createRadialGradient(
     size * 0.5, size * 0.45, size * 0.12,
     size * 0.5, size * 0.5, size * 0.72
@@ -72,7 +130,6 @@ function makeNumberTexture(n, size = 512) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
-  // Inner triangle guide (visual centering aid)
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
   ctx.lineWidth = Math.max(4, size * 0.012);
   ctx.beginPath();
@@ -82,19 +139,16 @@ function makeNumberTexture(n, size = 512) {
   ctx.closePath();
   ctx.stroke();
 
-  // Number
-  const fontPx = Math.floor(size * 0.30);
+  const fontPx = Math.floor(size * 0.20);
   ctx.font = `800 ${fontPx}px system-ui, Segoe UI, Arial`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  // Shadow
   ctx.fillStyle = "rgba(0,0,0,0.55)";
-  ctx.fillText(String(n), size * 0.502, size * 0.532);
+  ctx.fillText(String(n), size * 0.502, size * 0.512);
 
-  // Main glyph
   ctx.fillStyle = "rgba(255,255,255,0.88)";
-  ctx.fillText(String(n), size * 0.50, size * 0.52);
+  ctx.fillText(String(n), size * 0.50, size * 0.49);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -127,7 +181,7 @@ function addWorldOrientedFaceUVs(geo, pad = 0.18) {
   const p2 = new THREE.Vector2();
 
   for (let i = 0; i < pos.count; i += 3) {
-    a.fromBufferAttribute(pos, i + 0);
+    a.fromBufferAttribute(pos, i);
     b.fromBufferAttribute(pos, i + 1);
     c.fromBufferAttribute(pos, i + 2);
 
@@ -184,10 +238,13 @@ function addWorldOrientedFaceUVs(geo, pad = 0.18) {
 }
 
 // --------------------
-// D20
+// Visual D20
 // --------------------
-let d20Geo = new THREE.IcosahedronGeometry(1, 0).toNonIndexed();
+let d20Geo = ensureNonIndexed(new THREE.IcosahedronGeometry(1, 0));
 addWorldOrientedFaceUVs(d20Geo);
+
+d20Geo.clearGroups();
+for (let i = 0; i < 20; i++) d20Geo.addGroup(i * 3, 3, i);
 
 const materials = Array.from({ length: 20 }, (_, i) =>
   new THREE.MeshStandardMaterial({
@@ -197,43 +254,311 @@ const materials = Array.from({ length: 20 }, (_, i) =>
   })
 );
 
-d20Geo.clearGroups();
-for (let i = 0; i < 20; i++) d20Geo.addGroup(i * 3, 3, i);
-
 const d20 = new THREE.Mesh(d20Geo, materials);
 scene.add(d20);
 
-// Edges
-const edges = new THREE.EdgesGeometry(d20Geo, 20);
+// Die edges
+const dieEdges = new THREE.EdgesGeometry(d20Geo, 20);
 d20.add(
   new THREE.LineSegments(
-    edges,
+    dieEdges,
     new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true })
   )
 );
 
 // --------------------
-// Ground
+// Top-face highlight overlay
+// --------------------
+const topHighlightGeo = new THREE.BufferGeometry();
+topHighlightGeo.setAttribute(
+  "position",
+  new THREE.BufferAttribute(new Float32Array(9), 3)
+);
+
+const topHighlightMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.18,
+  side: THREE.DoubleSide,
+  depthTest: true,
+  depthWrite: false,
+  polygonOffset: true,
+  polygonOffsetFactor: -2,
+  polygonOffsetUnits: -2
+});
+
+const topHighlight = new THREE.Mesh(topHighlightGeo, topHighlightMat);
+d20.add(topHighlight);
+
+const topOutline = new THREE.LineSegments(
+  new THREE.EdgesGeometry(topHighlightGeo),
+  new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+);
+d20.add(topOutline);
+
+function setTopHighlightFace(faceIndex) {
+  const pos = d20Geo.attributes.position;
+  const base = faceIndex * 3;
+
+  const a = new THREE.Vector3().fromBufferAttribute(pos, base + 0);
+  const b = new THREE.Vector3().fromBufferAttribute(pos, base + 1);
+  const c = new THREE.Vector3().fromBufferAttribute(pos, base + 2);
+
+  const arr = topHighlightGeo.attributes.position.array;
+  arr[0] = a.x; arr[1] = a.y; arr[2] = a.z;
+  arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
+  arr[6] = c.x; arr[7] = c.y; arr[8] = c.z;
+
+  topHighlightGeo.attributes.position.needsUpdate = true;
+
+  topOutline.geometry.dispose();
+  topOutline.geometry = new THREE.EdgesGeometry(topHighlightGeo);
+}
+
+// --------------------
+// Ground (visual)
 // --------------------
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 20),
+  new THREE.PlaneGeometry(60, 60),
   new THREE.MeshStandardMaterial({ roughness: 1 })
 );
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -1.4;
+ground.position.y = 0;
 scene.add(ground);
 
 // --------------------
-// Animate
+// Physics world (gravity)
 // --------------------
-function animate() {
+const world = new CANNON.World({
+  gravity: new CANNON.Vec3(0, -9.82, 0)
+});
+
+const matDie = new CANNON.Material("die");
+const matGround = new CANNON.Material("ground");
+
+world.defaultContactMaterial.friction = 0.35;
+world.defaultContactMaterial.restitution = 0.12;
+
+world.addContactMaterial(
+  new CANNON.ContactMaterial(matDie, matGround, {
+    friction: 0.38,
+    restitution: 0.10
+  })
+);
+
+// Ground body
+const groundBody = new CANNON.Body({
+  mass: 0,
+  material: matGround,
+  shape: new CANNON.Plane()
+});
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
+
+// --------------------
+// Physics D20 body (ConvexPolyhedron)
+// Robust to indexed OR non-indexed geometries
+// --------------------
+const physicsGeo = new THREE.IcosahedronGeometry(1, 0);
+const pPos = physicsGeo.attributes.position;
+const hasIndex = !!physicsGeo.index;
+
+const verts = [];
+for (let i = 0; i < pPos.count; i++) {
+  verts.push(new CANNON.Vec3(pPos.getX(i), pPos.getY(i), pPos.getZ(i)));
+}
+
+const faces = [];
+if (hasIndex) {
+  const idx = physicsGeo.index.array;
+  for (let i = 0; i < idx.length; i += 3) {
+    faces.push([idx[i], idx[i + 1], idx[i + 2]]);
+  }
+} else {
+  for (let i = 0; i < pPos.count; i += 3) {
+    faces.push([i, i + 1, i + 2]);
+  }
+}
+
+const dieShape = new CANNON.ConvexPolyhedron({ vertices: verts, faces });
+
+const dieBody = new CANNON.Body({
+  mass: 1.2,
+  material: matDie,
+  shape: dieShape,
+  linearDamping: 0.20,
+  angularDamping: 0.22
+});
+
+dieBody.position.set(0, 2.2, 0);
+world.addBody(dieBody);
+
+// --------------------
+// Top face detection (render-geo normals)
+// --------------------
+const faceNormalsLocal = [];
+{
+  const pos = d20Geo.attributes.position;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const ab = new THREE.Vector3();
+  const ac = new THREE.Vector3();
+  const n = new THREE.Vector3();
+
+  for (let i = 0; i < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, i + 1);
+    c.fromBufferAttribute(pos, i + 2);
+    ab.copy(b).sub(a);
+    ac.copy(c).sub(a);
+    n.copy(ab).cross(ac).normalize();
+    faceNormalsLocal.push(n.clone());
+  }
+}
+
+const upWorld = new THREE.Vector3(0, 1, 0);
+
+function getTopFaceFromQuaternion(q) {
+  let bestIdx = 0;
+  let bestDot = -Infinity;
+  const nWorld = new THREE.Vector3();
+
+  for (let i = 0; i < faceNormalsLocal.length; i++) {
+    nWorld.copy(faceNormalsLocal[i]).applyQuaternion(q);
+    const d = nWorld.dot(upWorld);
+    if (d > bestDot) {
+      bestDot = d;
+      bestIdx = i;
+    }
+  }
+  return { faceIndex: bestIdx, value: bestIdx + 1 };
+}
+
+// --------------------
+// Roll state (settle detection)
+// --------------------
+let rolling = false;
+
+let settleFrames = 0;
+const SETTLE_FRAMES_REQUIRED = 18; // ~0.3s at 60fps
+const LIN_EPS = 0.12;
+const ANG_EPS = 0.22;
+
+let rollStartTime = 0;
+const MAX_ROLL_SECONDS = 6.0;
+
+function finalizeRoll() {
+  rolling = false;
+
+  const top = getTopFaceFromQuaternion(d20.quaternion);
+  resultPill.textContent = `TOP: ${top.value}`;
+  setTopHighlightFace(top.faceIndex);
+
+  rollBtn.disabled = false;
+  rollBtn.style.opacity = "1";
+  rollBtn.style.cursor = "pointer";
+}
+
+function startRoll() {
+  if (rolling) return;
+  rolling = true;
+
+  settleFrames = 0;
+  rollStartTime = performance.now();
+
+  rollBtn.disabled = true;
+  rollBtn.style.opacity = "0.55";
+  rollBtn.style.cursor = "not-allowed";
+  resultPill.textContent = "TOP: …";
+
+  dieBody.wakeUp?.();
+  dieBody.velocity.set(0, 0, 0);
+  dieBody.angularVelocity.set(0, 0, 0);
+
+  dieBody.position.set(rand(-1.0, 1.0), 3.0, rand(-1.0, 1.0));
+  dieBody.quaternion.setFromEuler(
+    rand(0, Math.PI * 2),
+    rand(0, Math.PI * 2),
+    rand(0, Math.PI * 2)
+  );
+
+  const impulse = new CANNON.Vec3(
+    rand(-2.5, 2.5),
+    rand(2.8, 4.4),
+    rand(-2.5, 2.5)
+  );
+  dieBody.applyImpulse(impulse, dieBody.position);
+
+  dieBody.torque.set(rand(-18, 18), rand(-18, 18), rand(-18, 18));
+}
+
+rollBtn.addEventListener("click", startRoll);
+
+// --------------------
+// Sync visuals to physics
+// --------------------
+function syncMeshFromBody() {
+  d20.position.set(dieBody.position.x, dieBody.position.y, dieBody.position.z);
+  d20.quaternion.set(
+    dieBody.quaternion.x,
+    dieBody.quaternion.y,
+    dieBody.quaternion.z,
+    dieBody.quaternion.w
+  );
+}
+
+syncMeshFromBody();
+{
+  const top = getTopFaceFromQuaternion(d20.quaternion);
+  resultPill.textContent = `TOP: ${top.value}`;
+  setTopHighlightFace(top.faceIndex);
+}
+
+// --------------------
+// Animate + physics stepping
+// --------------------
+let lastT = performance.now();
+let acc = 0;
+const FIXED = 1 / 60;
+
+function animate(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  acc += dt;
+
+  while (acc >= FIXED) {
+    world.step(FIXED);
+    acc -= FIXED;
+  }
+
+  syncMeshFromBody();
+
+  if (rolling) {
+    const lin = dieBody.velocity.length();
+    const ang = dieBody.angularVelocity.length();
+
+    if (lin < LIN_EPS && ang < ANG_EPS) {
+      settleFrames++;
+    } else {
+      settleFrames = 0;
+    }
+
+    if (settleFrames >= SETTLE_FRAMES_REQUIRED) {
+      finalizeRoll();
+    } else {
+      const elapsed = (performance.now() - rollStartTime) / 1000;
+      if (elapsed > MAX_ROLL_SECONDS) {
+        finalizeRoll();
+      }
+    }
+  }
+
   controls.update();
-  d20.rotation.y += 0.003;
-  d20.rotation.x += 0.0015;
   renderer.render(scene, camera);
   requestAnimationFrame(animate);
 }
-animate();
+requestAnimationFrame(animate);
 
 // --------------------
 // Resize
