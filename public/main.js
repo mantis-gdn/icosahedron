@@ -421,11 +421,11 @@ world.addContactMaterial(
   })
 );
 
-// Die vs wood rails (snappy)
+// Die vs wood rails (MORE BOUNCY)
 world.addContactMaterial(
   new CANNON.ContactMaterial(matDie, matWall, {
-    friction: 0.18,
-    restitution: 0.38
+    friction: 0.06,        // was 0.18 (less energy loss on scrape)
+    restitution: 0.72      // was 0.38 (much bouncier)
   })
 );
 
