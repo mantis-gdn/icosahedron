@@ -622,6 +622,19 @@ const dieBody = new CANNON.Body({
 dieBody.position.set(0, 2.2, 0);
 world.addBody(dieBody);
 
+// --- Sleep tuning (makes roll completion reliable) ---
+dieBody.allowSleep = true;
+dieBody.sleepSpeedLimit = 0.12; // speed below which it CAN sleep
+dieBody.sleepTimeLimit = 0.35;  // seconds it must stay slow to sleep
+
+// Roll state (settle detection)
+let rolling = false;
+
+dieBody.addEventListener("sleep", () => {
+  if (!rolling) return;
+  finalizeRoll(); // finalizeRoll is defined below; safe because event fires later
+});
+
 // --------------------
 // Top face detection (render-geo normals)
 // --------------------
@@ -647,15 +660,16 @@ const faceNormalsLocal = [];
 }
 
 const upWorld = new THREE.Vector3(0, 1, 0);
+const _qTmp = new THREE.Quaternion();
+const _nWorldTmp = new THREE.Vector3();
 
 function getTopFaceFromQuaternion(q) {
   let bestIdx = 0;
   let bestDot = -Infinity;
-  const nWorld = new THREE.Vector3();
 
   for (let i = 0; i < faceNormalsLocal.length; i++) {
-    nWorld.copy(faceNormalsLocal[i]).applyQuaternion(q);
-    const d = nWorld.dot(upWorld);
+    _nWorldTmp.copy(faceNormalsLocal[i]).applyQuaternion(q);
+    const d = _nWorldTmp.dot(upWorld);
     if (d > bestDot) {
       bestDot = d;
       bestIdx = i;
@@ -667,20 +681,27 @@ function getTopFaceFromQuaternion(q) {
 // --------------------
 // Roll state (settle detection)
 // --------------------
-let rolling = false;
-
 let settleFrames = 0;
 const SETTLE_FRAMES_REQUIRED = 18; // ~0.3s at 60fps
 const LIN_EPS = 0.12;
 const ANG_EPS = 0.22;
 
 let rollStartTime = 0;
-const MAX_ROLL_SECONDS = 6.0;
+const MAX_ROLL_SECONDS = 8.0; // increased slightly since sleep is primary
 
 function finalizeRoll() {
+  if (!rolling) return;
   rolling = false;
 
-  const top = getTopFaceFromQuaternion(d20.quaternion);
+  // Use physics quaternion as source of truth
+  _qTmp.set(
+    dieBody.quaternion.x,
+    dieBody.quaternion.y,
+    dieBody.quaternion.z,
+    dieBody.quaternion.w
+  );
+
+  const top = getTopFaceFromQuaternion(_qTmp);
   topPill.textContent = `TOP: ${top.value}`;
   setTopHighlightFace(top.faceIndex);
 
@@ -727,7 +748,10 @@ function startRoll() {
   topPill.textContent = "TOP: …";
   setStatus("Rolling…");
 
-  dieBody.wakeUp?.();
+  // Hard reset sleep + motion
+  dieBody.wakeUp();
+  dieBody.sleepState = 0;
+
   dieBody.velocity.set(0, 0, 0);
   dieBody.angularVelocity.set(0, 0, 0);
 
@@ -765,7 +789,13 @@ function syncMeshFromBody() {
 
 syncMeshFromBody();
 {
-  const top = getTopFaceFromQuaternion(d20.quaternion);
+  _qTmp.set(
+    dieBody.quaternion.x,
+    dieBody.quaternion.y,
+    dieBody.quaternion.z,
+    dieBody.quaternion.w
+  );
+  const top = getTopFaceFromQuaternion(_qTmp);
   topPill.textContent = `TOP: ${top.value}`;
   setTopHighlightFace(top.faceIndex);
 }
@@ -790,6 +820,7 @@ function animate(now) {
   syncMeshFromBody();
   updateCameraFollow();
 
+  // Fallback settle detection (sleep event is primary)
   if (rolling) {
     const lin = dieBody.velocity.length();
     const ang = dieBody.angularVelocity.length();

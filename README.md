@@ -13,18 +13,18 @@ The playfield is a **compact dice tray**: casino-felt base plus **4 surrounding 
 
 ## ✨ Features
 
-- 🎲 True **D20 (icosahedron)** geometry
-- 🧲 **Gravity + physics** (Cannon-ES)
-- 🧮 Upright, centered face numbers
-- ⬆️ Automatic **top face detection**
-- 🔺 Visual highlight of the top face
-- 🛑 Reliable roll completion (no frozen states)
-- 🧠 Deterministic settle detection (velocity-based, not sleep-state hacks)
-- 🧱 **Compact casino-felt playfield** (tight tabletop scale)
-- 🧱 **4-wall dice tray** (die bounces off rails, stays on the table)
-- 🧨 **Bouncy wall tuning** (higher restitution, lower friction vs rails)
-- 🎥 **Die-following orbit camera** (smooth, non-snapping)
-- 🎛 Orbit camera controls (user-adjustable)
+- 🎲 True **D20 (icosahedron)** geometry  
+- 🧲 **Gravity + physics** (Cannon-ES)  
+- 🧮 Upright, centered face numbers  
+- ⬆️ Automatic **top face detection**  
+- 🔺 Visual highlight of the top face  
+- 🛑 Reliable roll completion (no frozen states)  
+- 💤 **Sleep-assisted settle detection** (Cannon “sleep” event) **+** velocity fallback  
+- 🧱 **Compact casino-felt playfield** (tight tabletop scale)  
+- 🧱 **4-wall dice tray** (die bounces off rails, stays on the table)  
+- 🧨 **Bouncy wall tuning** (higher restitution, lower friction vs rails)  
+- 🎥 **Die-following orbit camera** (smooth, non-snapping)  
+- 🎛 Orbit camera controls (user-adjustable)  
 - 🎯 **Guessing game HUD**:
   - Lock a guess (1–20)
   - Roll to resolve
@@ -34,10 +34,10 @@ The playfield is a **compact dice tray**: casino-felt base plus **4 surrounding 
 
 ## 🧰 Tech Stack
 
-- **Three.js** — 3D rendering
-- **Cannon-ES** — Physics engine
-- **Node.js + Express** — Local dev server
-- **ES Modules** — Modern browser imports
+- **Three.js** — 3D rendering  
+- **Cannon-ES** — Physics engine  
+- **Node.js + Express** — Local dev server  
+- **ES Modules** — Modern browser imports  
 
 ---
 
@@ -76,10 +76,10 @@ http://localhost:3000
 
 ### HUD Readouts
 
-- **GUESS:** your locked guess for the round
-- **TOP:** the final top face after the roll
-- **ROUNDS / HITS / STREAK / BEST:** simple score tracking
-- **STATUS:** what to do next (or your result)
+- **GUESS:** your locked guess for the round  
+- **TOP:** the final top face after the roll  
+- **ROUNDS / HITS / STREAK / BEST:** simple score tracking  
+- **STATUS:** what to do next (or your result)  
 
 ---
 
@@ -92,8 +92,10 @@ http://localhost:3000
 - During the roll:
   - The camera smoothly **tracks the die’s position**
   - Orbit angle and zoom are preserved
-- When linear + angular velocity drop below thresholds:
-  - The roll finalizes
+- The roll finalizes when the physics body is considered settled:
+  - Primary signal: Cannon-ES **sleep** event (engine-declared “done”)
+  - Fallback: linear + angular velocity thresholds over multiple frames
+- Once settled:
   - The **top face value is calculated**
   - The top triangle is highlighted visually
 
@@ -108,14 +110,14 @@ Just real physics and spatial continuity.
 
 The tray is made of:
 
-- **Visual base**: a compact plane tinted casino-felt green
-- **Physics base**: a single infinite Cannon plane (flat ground)
-- **4 walls**: static box colliders placed at the playfield edges
+- **Visual base**: a compact plane tinted casino-felt green  
+- **Physics base**: a single infinite Cannon plane (flat ground)  
+- **4 walls**: static box colliders placed at the playfield edges  
 
 Contacts are tuned with separate materials:
 
-- **Die vs felt**: higher friction, lower bounce (stable settle)
-- **Die vs wall**: lower friction, higher restitution (**snappy rebounds**)
+- **Die vs felt**: higher friction, lower bounce (stable settle)  
+- **Die vs wall**: lower friction, higher restitution (**snappy rebounds**)  
 
 If you want a tighter/looser tray, change the constants in `main.js`:
 
