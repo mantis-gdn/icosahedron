@@ -342,7 +342,7 @@ function setTopHighlightFace(faceIndex) {
 // Ground (visual) — UPDATED (smaller playfield)
 // --------------------
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(15, 15), // << was (60, 60)
+  new THREE.PlaneGeometry(7, 7), // << was (60, 60)
   new THREE.MeshStandardMaterial({
     roughness: 1,
     color: 0x0f5a3c
@@ -353,6 +353,53 @@ ground.position.y = 0;
 scene.add(ground);
 
 // --------------------
+// Dice tray walls (constants)
+// --------------------
+const PLAYFIELD_SIZE = 7;       // must match PlaneGeometry(15, 15)
+const WALL_HEIGHT = 2.0;         // wall height
+const WALL_THICKNESS = 0.35;     // wall thickness
+
+// --------------------
+// Walls (visual)
+// --------------------
+const wallMat = new THREE.MeshStandardMaterial({
+  color: 0x2a1b12,   // deep wood rail
+  roughness: 0.55,
+  metalness: 0.05
+});
+
+const _half = PLAYFIELD_SIZE * 0.5;
+const _wallY = WALL_HEIGHT * 0.5;
+
+const wallZGeom = new THREE.BoxGeometry(
+  PLAYFIELD_SIZE + WALL_THICKNESS * 2,
+  WALL_HEIGHT,
+  WALL_THICKNESS
+);
+
+const wallXGeom = new THREE.BoxGeometry(
+  WALL_THICKNESS,
+  WALL_HEIGHT,
+  PLAYFIELD_SIZE + WALL_THICKNESS * 2
+);
+
+const wallNorth = new THREE.Mesh(wallZGeom, wallMat);
+wallNorth.position.set(0, _wallY, +_half + WALL_THICKNESS * 0.5);
+scene.add(wallNorth);
+
+const wallSouth = new THREE.Mesh(wallZGeom, wallMat);
+wallSouth.position.set(0, _wallY, -_half - WALL_THICKNESS * 0.5);
+scene.add(wallSouth);
+
+const wallEast = new THREE.Mesh(wallXGeom, wallMat);
+wallEast.position.set(+_half + WALL_THICKNESS * 0.5, _wallY, 0);
+scene.add(wallEast);
+
+const wallWest = new THREE.Mesh(wallXGeom, wallMat);
+wallWest.position.set(-_half - WALL_THICKNESS * 0.5, _wallY, 0);
+scene.add(wallWest);
+
+// --------------------
 // Physics world (gravity)
 // --------------------
 const world = new CANNON.World({
@@ -361,14 +408,24 @@ const world = new CANNON.World({
 
 const matDie = new CANNON.Material("die");
 const matGround = new CANNON.Material("ground");
+const matWall = new CANNON.Material("wall");
 
 world.defaultContactMaterial.friction = 0.35;
 world.defaultContactMaterial.restitution = 0.12;
 
+// Die vs felt
 world.addContactMaterial(
   new CANNON.ContactMaterial(matDie, matGround, {
     friction: 0.38,
     restitution: 0.10
+  })
+);
+
+// Die vs wood rails (snappy)
+world.addContactMaterial(
+  new CANNON.ContactMaterial(matDie, matWall, {
+    friction: 0.18,
+    restitution: 0.38
   })
 );
 
@@ -380,6 +437,40 @@ const groundBody = new CANNON.Body({
 });
 groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 world.addBody(groundBody);
+
+// --------------------
+// Walls (physics)
+// --------------------
+const wallShapeZ = new CANNON.Box(new CANNON.Vec3(
+  (PLAYFIELD_SIZE * 0.5) + WALL_THICKNESS,
+  (WALL_HEIGHT * 0.5),
+  (WALL_THICKNESS * 0.5)
+));
+
+const wallShapeX = new CANNON.Box(new CANNON.Vec3(
+  (WALL_THICKNESS * 0.5),
+  (WALL_HEIGHT * 0.5),
+  (PLAYFIELD_SIZE * 0.5) + WALL_THICKNESS
+));
+
+function addStaticWall(shape, x, y, z) {
+  const body = new CANNON.Body({
+    mass: 0,
+    material: matWall
+  });
+  body.addShape(shape);
+  body.position.set(x, y, z);
+  world.addBody(body);
+  return body;
+}
+
+// +Z / -Z walls
+addStaticWall(wallShapeZ, 0, _wallY, +_half + WALL_THICKNESS * 0.5);
+addStaticWall(wallShapeZ, 0, _wallY, -_half - WALL_THICKNESS * 0.5);
+
+// +X / -X walls
+addStaticWall(wallShapeX, +_half + WALL_THICKNESS * 0.5, _wallY, 0);
+addStaticWall(wallShapeX, -_half - WALL_THICKNESS * 0.5, _wallY, 0);
 
 // --------------------
 // Physics D20 body (ConvexPolyhedron)
