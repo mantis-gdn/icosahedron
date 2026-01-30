@@ -39,6 +39,29 @@ controls.enableDamping = true;
 controls.target.set(0, 0.6, 0);
 
 // --------------------
+// Camera follow (tracks die position without breaking OrbitControls)
+// --------------------
+const FOLLOW_SMOOTH = 0.18;     // lower = snappier (0.12–0.25 sweet spot)
+const FOLLOW_TARGET_Y = 0.25;   // aim a bit above center so top stays favored
+
+const _desiredTarget = new THREE.Vector3();
+const _smoothedTarget = new THREE.Vector3().copy(controls.target);
+const _delta = new THREE.Vector3();
+
+function updateCameraFollow() {
+  // Aim slightly above the die center so the camera tends to keep the top in view
+  _desiredTarget.set(d20.position.x, d20.position.y + FOLLOW_TARGET_Y, d20.position.z);
+
+  // Smooth to avoid jitter during fast physics motion
+  _smoothedTarget.lerp(_desiredTarget, FOLLOW_SMOOTH);
+
+  // Move camera by same amount target moves (preserves orbit/zoom)
+  _delta.subVectors(_smoothedTarget, controls.target);
+  camera.position.add(_delta);
+  controls.target.copy(_smoothedTarget);
+}
+
+// --------------------
 // Lights
 // --------------------
 scene.add(new THREE.AmbientLight(0xffffff, 0.35));
@@ -316,11 +339,14 @@ function setTopHighlightFace(faceIndex) {
 }
 
 // --------------------
-// Ground (visual)
+// Ground (visual) — UPDATED (smaller playfield)
 // --------------------
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 60),
-  new THREE.MeshStandardMaterial({ roughness: 1 })
+  new THREE.PlaneGeometry(15, 15), // << was (60, 60)
+  new THREE.MeshStandardMaterial({
+    roughness: 1,
+    color: 0x0f5a3c
+  })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
@@ -533,6 +559,7 @@ function animate(now) {
   }
 
   syncMeshFromBody();
+  updateCameraFollow(); // <-- follow the die every frame
 
   if (rolling) {
     const lin = dieBody.velocity.length();

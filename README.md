@@ -4,6 +4,8 @@ A physically simulated **Dungeons & Dragons D20** built with **Three.js** for re
 
 The die is **stationary by default**, rolls only when triggered, settles naturally under gravity, and correctly detects and highlights the **top face** after each roll.
 
+The camera **follows the die dynamically while rolling**, keeping the action centered without snapping or breaking orbit controls.
+
 ---
 
 ## ✨ Features
@@ -15,8 +17,9 @@ The die is **stationary by default**, rolls only when triggered, settles natural
 - 🔺 Visual highlight of the top face
 - 🛑 Reliable roll completion (no frozen states)
 - 🧠 Deterministic settle detection (velocity-based, not sleep-state hacks)
-- 🧱 Flat ground plane with friction & restitution tuning
-- 🎥 Orbit camera controls
+- 🧱 **Compact casino-felt playfield** (tight tabletop scale)
+- 🎥 **Die-following orbit camera** (smooth, non-snapping)
+- 🎛 Orbit camera controls (user-adjustable)
 
 ---
 
@@ -53,16 +56,22 @@ http://localhost:3000
 
 ## 🎮 How It Works
 
-- The die starts **at rest** on a flat surface.
+- The die starts **at rest** on a compact, flat felt surface.
 - Clicking **ROLL D20**:
   - Applies impulse + torque on all 3 axes
   - Lets physics resolve motion naturally
+- During the roll:
+  - The camera smoothly **tracks the die’s position**
+  - Orbit angle and zoom are preserved
 - When linear + angular velocity drop below thresholds:
   - The roll finalizes
   - The **top face value is calculated**
   - The top triangle is highlighted visually
 
-No fake animations. No snapping. Real physics.
+No fake animations.  
+No snapping.  
+No camera hacks.  
+Just real physics and spatial continuity.
 
 ---
 
@@ -107,7 +116,7 @@ These are intentional next-step upgrades.
 
 - 🎯 True D&D numbering layout (opposites = 21)
 - 🔊 Roll & collision sounds
-- 📷 Camera snap to top face
+- 📷 Camera snap to top face (optional mode)
 - 🎲 Multiple dice / dice tray
 - 🔁 Seeded deterministic rolls
 - 🕹 UI history / roll log
