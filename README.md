@@ -1,8 +1,9 @@
-# Icosahedron D20 (Three.js + Cannon-ES)
+# Icosahedron D20 Guessing Game (Three.js + Cannon-ES)
 
-A physically simulated **Dungeons & Dragons D20** built with **Three.js** for rendering and **Cannon-ES** for real gravity, collisions, and rolling behavior.
+A physically simulated **Dungeons & Dragons D20** built with **Three.js** for rendering and **Cannon-ES** for real gravity, collisions, and rolling behavior — now turned into a simple **number guessing game**.
 
-The die is **stationary by default**, rolls only when triggered, settles naturally under gravity, and correctly detects and highlights the **top face** after each roll.
+You **lock a guess (1–20)**, roll the die, and the game tracks your **hits, streak, and best streak**.  
+The die rolls with real physics, **settles naturally**, then **detects + highlights the top face** to resolve the round.
 
 The camera **follows the die dynamically while rolling**, keeping the action centered without snapping or breaking orbit controls.
 
@@ -21,8 +22,13 @@ The playfield is a **compact dice tray**: casino-felt base plus **4 surrounding 
 - 🧠 Deterministic settle detection (velocity-based, not sleep-state hacks)
 - 🧱 **Compact casino-felt playfield** (tight tabletop scale)
 - 🧱 **4-wall dice tray** (die bounces off rails, stays on the table)
+- 🧨 **Bouncy wall tuning** (higher restitution, lower friction vs rails)
 - 🎥 **Die-following orbit camera** (smooth, non-snapping)
 - 🎛 Orbit camera controls (user-adjustable)
+- 🎯 **Guessing game HUD**:
+  - Lock a guess (1–20)
+  - Roll to resolve
+  - Tracks rounds, hits, streak, best streak
 
 ---
 
@@ -57,18 +63,35 @@ http://localhost:3000
 
 ---
 
-## 🎮 How It Works
+## 🎮 How To Play (Guessing Game)
+
+1. Enter a number **1–20**
+2. Click **LOCK GUESS**
+3. Click **ROLL D20**
+4. When the die settles:
+   - The **top face** is detected and highlighted
+   - The round resolves as **HIT** (match) or **MISS**
+   - Stats update automatically
+   - The game unlocks so you can lock a new guess
+
+### HUD Readouts
+
+- **GUESS:** your locked guess for the round
+- **TOP:** the final top face after the roll
+- **ROUNDS / HITS / STREAK / BEST:** simple score tracking
+- **STATUS:** what to do next (or your result)
+
+---
+
+## 🎲 How The Roll Works
 
 - The die starts **at rest** on a compact, flat felt surface.
 - Clicking **ROLL D20**:
-  - Applies impulse + torque on all 3 axes
+  - Applies **impulse + torque** on all 3 axes
   - Lets physics resolve motion naturally
 - During the roll:
   - The camera smoothly **tracks the die’s position**
   - Orbit angle and zoom are preserved
-- The die is contained by **4 tray walls**:
-  - The die can **bounce** off the rails instead of escaping the playfield
-  - Walls are static physics bodies (mass = 0) positioned at the edges of the felt
 - When linear + angular velocity drop below thresholds:
   - The roll finalizes
   - The **top face value is calculated**
@@ -85,20 +108,25 @@ Just real physics and spatial continuity.
 
 The tray is made of:
 
-- **Visual base**: a 15×15 plane tinted casino-felt green
+- **Visual base**: a compact plane tinted casino-felt green
 - **Physics base**: a single infinite Cannon plane (flat ground)
-- **4 walls**: thin box colliders placed at the playfield edges
+- **4 walls**: static box colliders placed at the playfield edges
 
 Contacts are tuned with separate materials:
 
 - **Die vs felt**: higher friction, lower bounce (stable settle)
-- **Die vs wall**: lower friction, higher restitution (snappy rebounds)
+- **Die vs wall**: lower friction, higher restitution (**snappy rebounds**)
 
 If you want a tighter/looser tray, change the constants in `main.js`:
 
 - `PLAYFIELD_SIZE`
 - `WALL_HEIGHT`
 - `WALL_THICKNESS`
+
+To make walls **more/less bouncy**, adjust the Die-vs-Wall contact material:
+
+- `restitution` (higher = bouncier)
+- `friction` (lower = less energy loss on scrape)
 
 ---
 
@@ -134,7 +162,7 @@ This guarantees correct results regardless of orientation.
 - Face numbering is **sequential**, not casino-balanced  
   (opposite faces do NOT yet sum to 21)
 - No sound effects yet
-- No multiplayer / networking (single die, single client)
+- No multiplayer / networking (single client)
 
 These are intentional next-step upgrades.
 
@@ -144,10 +172,11 @@ These are intentional next-step upgrades.
 
 - 🎯 True D&D numbering layout (opposites = 21)
 - 🔊 Roll & collision sounds (including wall hits)
-- 📷 Camera snap to top face (optional mode)
+- 🧠 Add house rules (e.g., points for “close” guesses, hot/cold hints)
+- 📊 Guess history + top-face roll log
 - 🎲 Multiple dice / dice tray variations (higher walls, rounded corners, etc.)
 - 🔁 Seeded deterministic rolls
-- 🕹 UI history / roll log
+- 🏆 Local leaderboard (best streak / hit rate)
 
 ---
 

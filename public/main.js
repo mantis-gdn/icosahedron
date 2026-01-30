@@ -51,6 +51,7 @@ const _delta = new THREE.Vector3();
 function updateCameraFollow() {
   _desiredTarget.set(d20.position.x, d20.position.y + FOLLOW_TARGET_Y, d20.position.z);
   _smoothedTarget.lerp(_desiredTarget, FOLLOW_SMOOTH);
+
   _delta.subVectors(_smoothedTarget, controls.target);
   camera.position.add(_delta);
   controls.target.copy(_smoothedTarget);
@@ -70,7 +71,7 @@ rim.position.set(-8, 3, -6);
 scene.add(rim);
 
 // --------------------
-// UI
+// UI (Guessing Game HUD)
 // --------------------
 const ui = document.createElement("div");
 ui.style.cssText = `
@@ -78,42 +79,170 @@ ui.style.cssText = `
   left: 16px;
   bottom: 16px;
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
   z-index: 10;
   user-select: none;
 `;
 
-const rollBtn = document.createElement("button");
-rollBtn.textContent = "ROLL D20";
-rollBtn.style.cssText = `
-  background: rgba(255,255,255,0.08);
+function makePill(text) {
+  const el = document.createElement("div");
+  el.textContent = text;
+  el.style.cssText = `
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.85);
+    font: 700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    white-space: nowrap;
+  `;
+  return el;
+}
+
+function makeBtn(label) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.cssText = `
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.92);
+    padding: 10px 14px;
+    font: 800 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    letter-spacing: 0.08em;
+    border-radius: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+  `;
+  b.onmouseenter = () => (b.style.background = "rgba(255,255,255,0.12)");
+  b.onmouseleave = () => (b.style.background = "rgba(255,255,255,0.08)");
+  return b;
+}
+
+const guessWrap = document.createElement("div");
+guessWrap.style.cssText = `
+  display:flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-right: 6px;
+`;
+
+const guessLabel = document.createElement("div");
+guessLabel.textContent = "GUESS (1–20)";
+guessLabel.style.cssText = `
+  font: 800 11px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  letter-spacing: 0.12em;
+  color: rgba(255,255,255,0.60);
+`;
+
+const guessInput = document.createElement("input");
+guessInput.type = "number";
+guessInput.min = "1";
+guessInput.max = "20";
+guessInput.step = "1";
+guessInput.value = "1";
+guessInput.style.cssText = `
+  width: 92px;
+  padding: 10px 10px;
+  border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.05);
   color: rgba(255,255,255,0.92);
-  padding: 10px 14px;
-  font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-  letter-spacing: 0.08em;
-  border-radius: 12px;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-`;
-rollBtn.onmouseenter = () => (rollBtn.style.background = "rgba(255,255,255,0.12)");
-rollBtn.onmouseleave = () => (rollBtn.style.background = "rgba(255,255,255,0.08)");
-
-const resultPill = document.createElement("div");
-resultPill.textContent = "TOP: —";
-resultPill.style.cssText = `
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: rgba(255,255,255,0.85);
-  font: 700 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font: 800 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  outline: none;
 `;
 
+guessWrap.appendChild(guessLabel);
+guessWrap.appendChild(guessInput);
+
+const lockBtn = makeBtn("LOCK GUESS");
+const rollBtn = makeBtn("ROLL D20");
+
+const guessPill = makePill("GUESS: —");
+const topPill = makePill("TOP: —");
+const statsPill = makePill("ROUNDS: 0 HITS: 0 STREAK: 0 BEST: 0");
+const statusPill = makePill("Lock a guess to start.");
+statusPill.style.maxWidth = "520px";
+statusPill.style.overflow = "hidden";
+statusPill.style.textOverflow = "ellipsis";
+
+ui.appendChild(guessWrap);
+ui.appendChild(lockBtn);
 ui.appendChild(rollBtn);
-ui.appendChild(resultPill);
+ui.appendChild(guessPill);
+ui.appendChild(topPill);
+ui.appendChild(statsPill);
+ui.appendChild(statusPill);
 document.body.appendChild(ui);
+
+// --------------------
+// Guessing game state
+// --------------------
+let lockedGuess = null;
+let rounds = 0;
+let hits = 0;
+let streak = 0;
+let best = 0;
+
+function clampInt(n, lo, hi) {
+  n = Math.trunc(n);
+  if (!Number.isFinite(n)) return lo;
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function setStatus(msg) {
+  statusPill.textContent = msg;
+}
+
+function setRollEnabled(on) {
+  rollBtn.disabled = !on;
+  rollBtn.style.opacity = on ? "1" : "0.55";
+  rollBtn.style.cursor = on ? "pointer" : "not-allowed";
+}
+
+function setLockEnabled(on) {
+  lockBtn.disabled = !on;
+  lockBtn.style.opacity = on ? "1" : "0.55";
+  lockBtn.style.cursor = on ? "pointer" : "not-allowed";
+  guessInput.disabled = !on;
+  guessInput.style.opacity = on ? "1" : "0.65";
+}
+
+function refreshHud() {
+  guessPill.textContent = `GUESS: ${lockedGuess ?? "—"}`;
+  statsPill.textContent = `ROUNDS: ${rounds} HITS: ${hits} STREAK: ${streak} BEST: ${best}`;
+}
+
+setRollEnabled(false);
+setLockEnabled(true);
+refreshHud();
+
+lockBtn.addEventListener("click", () => {
+  if (rolling) return;
+
+  const n = clampInt(parseInt(guessInput.value, 10), 1, 20);
+  guessInput.value = String(n);
+
+  lockedGuess = n;
+  refreshHud();
+
+  setLockEnabled(false);
+  setRollEnabled(true);
+  setStatus("Guess locked. Roll it.");
+});
+
+function unlockForNextRound() {
+  lockedGuess = null;
+  refreshHud();
+  setRollEnabled(false);
+  setLockEnabled(true);
+  setStatus("Lock a guess to start.");
+}
+
+guessInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !lockBtn.disabled) lockBtn.click();
+});
 
 // --------------------
 // Helpers
@@ -333,7 +462,7 @@ function setTopHighlightFace(faceIndex) {
 }
 
 // --------------------
-// Ground (visual) — UPDATED (smaller playfield)
+// Ground (visual) — compact casino felt
 // --------------------
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(7, 7),
@@ -349,7 +478,7 @@ scene.add(ground);
 // --------------------
 // Dice tray walls (constants)
 // --------------------
-const PLAYFIELD_SIZE = 7;
+const PLAYFIELD_SIZE = 7;      // must match PlaneGeometry
 const WALL_HEIGHT = 2.0;
 const WALL_THICKNESS = 0.35;
 
@@ -415,7 +544,7 @@ world.addContactMaterial(
   })
 );
 
-// Die vs wood rails (MORE BOUNCY)
+// Die vs wood rails (more bouncy)
 world.addContactMaterial(
   new CANNON.ContactMaterial(matDie, matWall, {
     friction: 0.06,
@@ -448,10 +577,7 @@ const wallShapeX = new CANNON.Box(new CANNON.Vec3(
 ));
 
 function addStaticWall(shape, x, y, z) {
-  const body = new CANNON.Body({
-    mass: 0,
-    material: matWall
-  });
+  const body = new CANNON.Body({ mass: 0, material: matWall });
   body.addShape(shape);
   body.position.set(x, y, z);
   world.addBody(body);
@@ -478,13 +604,9 @@ for (let i = 0; i < pPos.count; i++) {
 const faces = [];
 if (hasIndex) {
   const idx = physicsGeo.index.array;
-  for (let i = 0; i < idx.length; i += 3) {
-    faces.push([idx[i], idx[i + 1], idx[i + 2]]);
-  }
+  for (let i = 0; i < idx.length; i += 3) faces.push([idx[i], idx[i + 1], idx[i + 2]]);
 } else {
-  for (let i = 0; i < pPos.count; i += 3) {
-    faces.push([i, i + 1, i + 2]);
-  }
+  for (let i = 0; i < pPos.count; i += 3) faces.push([i, i + 1, i + 2]);
 }
 
 const dieShape = new CANNON.ConvexPolyhedron({ vertices: verts, faces });
@@ -548,7 +670,7 @@ function getTopFaceFromQuaternion(q) {
 let rolling = false;
 
 let settleFrames = 0;
-const SETTLE_FRAMES_REQUIRED = 18;
+const SETTLE_FRAMES_REQUIRED = 18; // ~0.3s at 60fps
 const LIN_EPS = 0.12;
 const ANG_EPS = 0.22;
 
@@ -559,25 +681,51 @@ function finalizeRoll() {
   rolling = false;
 
   const top = getTopFaceFromQuaternion(d20.quaternion);
-  resultPill.textContent = `TOP: ${top.value}`;
+  topPill.textContent = `TOP: ${top.value}`;
   setTopHighlightFace(top.faceIndex);
 
-  rollBtn.disabled = false;
-  rollBtn.style.opacity = "1";
-  rollBtn.style.cursor = "pointer";
+  // Guessing game resolve
+  if (lockedGuess != null) {
+    rounds++;
+
+    const hit = top.value === lockedGuess;
+    if (hit) {
+      hits++;
+      streak++;
+      best = Math.max(best, streak);
+      setStatus(`✅ HIT! You guessed ${lockedGuess} and it landed ${top.value}.`);
+    } else {
+      setStatus(`❌ MISS. You guessed ${lockedGuess}, it landed ${top.value}.`);
+      streak = 0;
+    }
+
+    refreshHud();
+
+    // auto-unlock for next round
+    unlockForNextRound();
+  } else {
+    setStatus("Lock a guess to start.");
+    setRollEnabled(false);
+    setLockEnabled(true);
+  }
 }
 
 function startRoll() {
   if (rolling) return;
+  if (lockedGuess == null) {
+    setStatus("Lock a guess first.");
+    return;
+  }
+
   rolling = true;
 
   settleFrames = 0;
   rollStartTime = performance.now();
 
-  rollBtn.disabled = true;
-  rollBtn.style.opacity = "0.55";
-  rollBtn.style.cursor = "not-allowed";
-  resultPill.textContent = "TOP: …";
+  setRollEnabled(false);
+  setLockEnabled(false);
+  topPill.textContent = "TOP: …";
+  setStatus("Rolling…");
 
   dieBody.wakeUp?.();
   dieBody.velocity.set(0, 0, 0);
@@ -618,7 +766,7 @@ function syncMeshFromBody() {
 syncMeshFromBody();
 {
   const top = getTopFaceFromQuaternion(d20.quaternion);
-  resultPill.textContent = `TOP: ${top.value}`;
+  topPill.textContent = `TOP: ${top.value}`;
   setTopHighlightFace(top.faceIndex);
 }
 
@@ -646,19 +794,14 @@ function animate(now) {
     const lin = dieBody.velocity.length();
     const ang = dieBody.angularVelocity.length();
 
-    if (lin < LIN_EPS && ang < ANG_EPS) {
-      settleFrames++;
-    } else {
-      settleFrames = 0;
-    }
+    if (lin < LIN_EPS && ang < ANG_EPS) settleFrames++;
+    else settleFrames = 0;
 
     if (settleFrames >= SETTLE_FRAMES_REQUIRED) {
       finalizeRoll();
     } else {
       const elapsed = (performance.now() - rollStartTime) / 1000;
-      if (elapsed > MAX_ROLL_SECONDS) {
-        finalizeRoll();
-      }
+      if (elapsed > MAX_ROLL_SECONDS) finalizeRoll();
     }
   }
 
