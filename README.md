@@ -6,6 +6,8 @@ The die is **stationary by default**, rolls only when triggered, settles natural
 
 The camera **follows the die dynamically while rolling**, keeping the action centered without snapping or breaking orbit controls.
 
+The playfield is a **compact dice tray**: casino-felt base plus **4 surrounding walls** so the die can **bounce** and stay contained.
+
 ---
 
 ## ✨ Features
@@ -18,6 +20,7 @@ The camera **follows the die dynamically while rolling**, keeping the action cen
 - 🛑 Reliable roll completion (no frozen states)
 - 🧠 Deterministic settle detection (velocity-based, not sleep-state hacks)
 - 🧱 **Compact casino-felt playfield** (tight tabletop scale)
+- 🧱 **4-wall dice tray** (die bounces off rails, stays on the table)
 - 🎥 **Die-following orbit camera** (smooth, non-snapping)
 - 🎛 Orbit camera controls (user-adjustable)
 
@@ -63,6 +66,9 @@ http://localhost:3000
 - During the roll:
   - The camera smoothly **tracks the die’s position**
   - Orbit angle and zoom are preserved
+- The die is contained by **4 tray walls**:
+  - The die can **bounce** off the rails instead of escaping the playfield
+  - Walls are static physics bodies (mass = 0) positioned at the edges of the felt
 - When linear + angular velocity drop below thresholds:
   - The roll finalizes
   - The **top face value is calculated**
@@ -75,9 +81,31 @@ Just real physics and spatial continuity.
 
 ---
 
+## 🧱 Dice Tray (Felt + Walls)
+
+The tray is made of:
+
+- **Visual base**: a 15×15 plane tinted casino-felt green
+- **Physics base**: a single infinite Cannon plane (flat ground)
+- **4 walls**: thin box colliders placed at the playfield edges
+
+Contacts are tuned with separate materials:
+
+- **Die vs felt**: higher friction, lower bounce (stable settle)
+- **Die vs wall**: lower friction, higher restitution (snappy rebounds)
+
+If you want a tighter/looser tray, change the constants in `main.js`:
+
+- `PLAYFIELD_SIZE`
+- `WALL_HEIGHT`
+- `WALL_THICKNESS`
+
+---
+
 ## 🧠 Top Face Detection
 
 Top face is determined by:
+
 1. Precomputing **local face normals**
 2. Transforming them by the die’s quaternion
 3. Selecting the face whose normal most closely aligns with world-up `(0,1,0)`
@@ -115,9 +143,9 @@ These are intentional next-step upgrades.
 ## 🔮 Possible Extensions
 
 - 🎯 True D&D numbering layout (opposites = 21)
-- 🔊 Roll & collision sounds
+- 🔊 Roll & collision sounds (including wall hits)
 - 📷 Camera snap to top face (optional mode)
-- 🎲 Multiple dice / dice tray
+- 🎲 Multiple dice / dice tray variations (higher walls, rounded corners, etc.)
 - 🔁 Seeded deterministic rolls
 - 🕹 UI history / roll log
 
