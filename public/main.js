@@ -49,13 +49,8 @@ const _smoothedTarget = new THREE.Vector3().copy(controls.target);
 const _delta = new THREE.Vector3();
 
 function updateCameraFollow() {
-  // Aim slightly above the die center so the camera tends to keep the top in view
   _desiredTarget.set(d20.position.x, d20.position.y + FOLLOW_TARGET_Y, d20.position.z);
-
-  // Smooth to avoid jitter during fast physics motion
   _smoothedTarget.lerp(_desiredTarget, FOLLOW_SMOOTH);
-
-  // Move camera by same amount target moves (preserves orbit/zoom)
   _delta.subVectors(_smoothedTarget, controls.target);
   camera.position.add(_delta);
   controls.target.copy(_smoothedTarget);
@@ -128,7 +123,6 @@ function rand(min, max) {
 }
 
 function ensureNonIndexed(geo) {
-  // Some Three builds already create non-indexed polyhedra
   return geo.index ? geo.toNonIndexed() : geo;
 }
 
@@ -342,7 +336,7 @@ function setTopHighlightFace(faceIndex) {
 // Ground (visual) — UPDATED (smaller playfield)
 // --------------------
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(7, 7), // << was (60, 60)
+  new THREE.PlaneGeometry(7, 7),
   new THREE.MeshStandardMaterial({
     roughness: 1,
     color: 0x0f5a3c
@@ -355,15 +349,15 @@ scene.add(ground);
 // --------------------
 // Dice tray walls (constants)
 // --------------------
-const PLAYFIELD_SIZE = 7;       // must match PlaneGeometry(15, 15)
-const WALL_HEIGHT = 2.0;         // wall height
-const WALL_THICKNESS = 0.35;     // wall thickness
+const PLAYFIELD_SIZE = 7;
+const WALL_HEIGHT = 2.0;
+const WALL_THICKNESS = 0.35;
 
 // --------------------
 // Walls (visual)
 // --------------------
 const wallMat = new THREE.MeshStandardMaterial({
-  color: 0x2a1b12,   // deep wood rail
+  color: 0x2a1b12,
   roughness: 0.55,
   metalness: 0.05
 });
@@ -424,8 +418,8 @@ world.addContactMaterial(
 // Die vs wood rails (MORE BOUNCY)
 world.addContactMaterial(
   new CANNON.ContactMaterial(matDie, matWall, {
-    friction: 0.06,        // was 0.18 (less energy loss on scrape)
-    restitution: 0.72      // was 0.38 (much bouncier)
+    friction: 0.06,
+    restitution: 0.72
   })
 );
 
@@ -464,17 +458,13 @@ function addStaticWall(shape, x, y, z) {
   return body;
 }
 
-// +Z / -Z walls
 addStaticWall(wallShapeZ, 0, _wallY, +_half + WALL_THICKNESS * 0.5);
 addStaticWall(wallShapeZ, 0, _wallY, -_half - WALL_THICKNESS * 0.5);
-
-// +X / -X walls
 addStaticWall(wallShapeX, +_half + WALL_THICKNESS * 0.5, _wallY, 0);
 addStaticWall(wallShapeX, -_half - WALL_THICKNESS * 0.5, _wallY, 0);
 
 // --------------------
 // Physics D20 body (ConvexPolyhedron)
-// Robust to indexed OR non-indexed geometries
 // --------------------
 const physicsGeo = new THREE.IcosahedronGeometry(1, 0);
 const pPos = physicsGeo.attributes.position;
@@ -558,7 +548,7 @@ function getTopFaceFromQuaternion(q) {
 let rolling = false;
 
 let settleFrames = 0;
-const SETTLE_FRAMES_REQUIRED = 18; // ~0.3s at 60fps
+const SETTLE_FRAMES_REQUIRED = 18;
 const LIN_EPS = 0.12;
 const ANG_EPS = 0.22;
 
@@ -650,7 +640,7 @@ function animate(now) {
   }
 
   syncMeshFromBody();
-  updateCameraFollow(); // <-- follow the die every frame
+  updateCameraFollow();
 
   if (rolling) {
     const lin = dieBody.velocity.length();
